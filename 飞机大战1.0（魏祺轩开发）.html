@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞机大战</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #game-container { position: relative; border-radius: 10px; overflow: hidden; box-shadow: 0 0 30px rgba(0,255,255,0.3); }
+        canvas { display: block; background: #000; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .health-bar { position: absolute; width: 150px; height: 20px; background: #333; border-radius: 10px; border: 2px solid #fff; overflow: hidden; }
+        .health-bar-fill { height: 100%; transition: width 0.3s ease; }
+        #player1-health { top: 20px; left: 20px; }
+        #player1-health .health-bar-fill { background: linear-gradient(90deg, #00ff00, #00cc00); }
+        #player2-health { top: 20px; right: 20px; }
+        #player2-health .health-bar-fill { background: linear-gradient(90deg, #ff0000, #cc0000); }
+        .health-label { position: absolute; color: #fff; font-weight: bold; font-size: 14px; text-shadow: 0 0 5px #000; }
+        #player1-label { top: 120px; left: 20px; }
+        #player2-label { top: 120px; right: 20px; }
+        #score-display { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00ffff; }
+        #wave-display { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: #ffff00; font-size: 24px; font-weight: bold; text-shadow: 0 0 15px #ffff00; z-index: 100; }
+        #level-display { position: absolute; top: 45px; left: 50%; transform: translateX(-50%); color: #00ffff; font-size: 18px; font-weight: bold; text-shadow: 0 0 10px #00ffff; z-index: 100; }
+        #nuclear-cooldown { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: #ff6600; font-size: 16px; font-weight: bold; }
+        .weapon-indicator { position: absolute; bottom: 50px; display: flex; gap: 10px; }
+        #player1-weapons { left: 20px; }
+        #player2-weapons { right: 20px; }
+        .weapon-btn { padding: 5px 15px; border: 2px solid #333; border-radius: 5px; color: #666; font-size: 12px; font-weight: bold; transition: all 0.3s; }
+        .weapon-btn.active { border-color: #00ffff; color: #00ffff; background: rgba(0,255,255,0.2); box-shadow: 0 0 10px rgba(0,255,255,0.5); }
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; }
+        .hidden { display: none !important; }
+        h1 { color: #00ffff; font-size: 48px; text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff; margin-bottom: 30px; }
+        h2 { color: #ff0000; font-size: 36px; text-shadow: 0 0 20px #ff0000; margin-bottom: 20px; }
+        h3 { color: #ffff00; font-size: 24px; margin-bottom: 20px; }
+        p { color: #fff; font-size: 16px; margin-bottom: 10px; text-align: center; }
+        button { padding: 15px 40px; font-size: 18px; font-weight: bold; color: #fff; background: linear-gradient(135deg, #00ffff, #0088ff); border: none; border-radius: 30px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 20px rgba(0,255,255,0.5); margin: 10px; }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 30px rgba(0,255,255,0.8); }
+        button.red { background: linear-gradient(135deg, #ff4444, #cc0000); box-shadow: 0 0 20px rgba(255,68,68,0.5); }
+        button.red:hover { box-shadow: 0 0 30px rgba(255,68,68,0.8); }
+        button.gold { background: linear-gradient(135deg, #ffaa00, #ff8800); box-shadow: 0 0 20px rgba(255,170,0,0.5); }
+        button.gold:hover { box-shadow: 0 0 30px rgba(255,170,0,0.8); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .controls { margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; max-width: 400px; }
+        .controls h3 { color: #00ffff; margin-bottom: 15px; }
+        .key { display: inline-block; padding: 5px 15px; background: #333; border: 2px solid #00ffff; border-radius: 5px; color: #00ffff; font-weight: bold; margin: 0 5px; }
+        .intro-content { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 1000px; }
+        .intro-column { flex: 1; min-width: 250px; padding: 18px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); }
+        .intro-column h3 { color: #00ffff; margin-bottom: 12px; text-align: center; font-size: 18px; }
+        .intro-section { margin-bottom: 15px; }
+        .intro-section strong { color: #ffff00; }
+        .intro-section p { color: #fff; font-size: 13px; line-height: 1.6; margin-bottom: 4px; }
+        .intro-controls { margin-top: 15px; padding-top: 15px; border-top: 2px solid rgba(0,255,255,0.3); }
+        .intro-controls .key-row { display: flex; justify-content: center; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+        .intro-controls .key-large { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a1a2e, #0f3460); border: 3px solid #00ffff; border-radius: 8px; color: #00ffff; font-weight: bold; font-size: 20px; box-shadow: 0 0 12px rgba(0,255,255,0.4); }
+        .intro-controls .key-group { display: flex; gap: 5px; }
+        .intro-controls .key-group .key-large { width: 38px; height: 38px; font-size: 18px; }
+        .intro-controls .label { color: #fff; font-size: 14px; font-weight: bold; }
+        .intro-controls .nuclear-key { width: 45px; height: 45px; background: linear-gradient(135deg, #4a0000, #880000); border-color: #ff0000; color: #ff0000; box-shadow: 0 0 12px rgba(255,0,0,0.4); }
+        #intro-confirm-box { margin-top: 25px; padding: 15px 40px; font-size: 20px; font-weight: bold; color: #00ffff; background: rgba(0,255,255,0.1); border: 2px solid #00ffff; border-radius: 30px; cursor: pointer; text-align: center; transition: all 0.3s; box-shadow: 0 0 20px rgba(0,255,255,0.3); }
+        #intro-confirm-box:hover { background: rgba(0,255,255,0.2); transform: scale(1.05); box-shadow: 0 0 30px rgba(0,255,255,0.6); }
+        #intro-confirm-box:active { transform: scale(0.98); }
+        #menu-footer { position: absolute; bottom: 20px; left: 20px; color: #00ffff; font-size: 14px; font-weight: bold; text-shadow: 0 0 10px #00ffff; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .mode-card { padding: 30px; background: rgba(255,255,255,0.05); border: 2px solid #333; border-radius: 15px; margin: 15px; cursor: pointer; transition: all 0.3s; min-width: 250px; }
+        .mode-card:hover { border-color: #00ffff; background: rgba(0,255,255,0.1); transform: scale(1.05); }
+        .mode-card h4 { color: #00ffff; font-size: 20px; margin-bottom: 10px; }
+        .mode-card p { color: #aaa; font-size: 14px; }
+        .weapon-card { padding: 20px; background: rgba(255,255,255,0.05); border: 2px solid #333; border-radius: 10px; margin: 10px; cursor: pointer; transition: all 0.3s; min-width: 150px; text-align: center; }
+        .weapon-card:hover { border-color: #00ffff; background: rgba(0,255,255,0.1); }
+        .weapon-card.selected { border-color: #00ff00; background: rgba(0,255,0,0.1); }
+        .weapon-card .icon { font-size: 32px; margin-bottom: 10px; }
+        .weapon-card .name { color: #00ffff; font-weight: bold; }
+        .weapon-card .desc { color: #aaa; font-size: 12px; margin-top: 5px; }
+        .vs-divider { position: absolute; top: 0; left: 50%; width: 2px; height: 100%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.3), transparent); }
+        .upgrade-card { padding: 25px; background: rgba(255,255,255,0.05); border: 2px solid #333; border-radius: 15px; margin: 15px; min-width: 220px; text-align: center; }
+        .upgrade-card h4 { color: #00ffff; font-size: 20px; margin-bottom: 15px; }
+        .upgrade-card .stat { color: #fff; font-size: 18px; margin-bottom: 10px; }
+        .upgrade-card .stat-value { color: #00ff00; font-weight: bold; }
+        .upgrade-card .cost { color: #ffaa00; font-size: 16px; margin-bottom: 15px; }
+        .player-stats { position: absolute; top: 20px; right: 20px; text-align: right; }
+        .player-stats div { color: #fff; font-size: 14px; margin-bottom: 5px; }
+        .player-stats .gold { color: #ffaa00; }
+        .player-stats .exp { color: #00ffff; }
+        .exp-bar { width: 150px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin-top: 5px; }
+        .exp-bar-fill { height: 100%; background: linear-gradient(90deg, #00ffff, #0088ff); transition: width 0.3s ease; }
+        .reward-popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px; border-radius: 15px; border: 2px solid #00ffff; text-align: center; }
+        .reward-popup h3 { color: #00ffff; margin-bottom: 20px; }
+        .reward-popup p { color: #fff; margin-bottom: 10px; }
+        .reward-popup .amount { color: #ffaa00; font-weight: bold; }
+        .touch-controls { display: none; }
+        @media (max-width: 800px) {
+            #game-container { width: 100%; height: 100vh; }
+            #game-canvas { width: 100%; height: 100%; }
+            .weapon-indicator { display: none; }
+            .touch-controls { display: flex; position: absolute; bottom: 0; left: 0; width: 100%; height: 200px; }
+            .d-pad { position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px; }
+            .d-btn { position: absolute; width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 10px; border: 2px solid rgba(255,255,255,0.5); }
+            .d-btn:active { background: rgba(0,255,255,0.5); }
+            .d-up { top: 0; left: 50px; }
+            .d-left { top: 50px; left: 0; }
+            .d-center { top: 50px; left: 50px; width: 50px; height: 50px; background: rgba(0,255,255,0.3); border-radius: 50%; }
+            .d-right { top: 50px; right: 0; }
+            .d-down { bottom: 0; left: 50px; }
+            .weapon-controls { position: absolute; bottom: 20px; right: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+            .weapon-touch-btn { padding: 15px 20px; background: rgba(255,255,255,0.2); border-radius: 10px; border: 2px solid rgba(255,255,255,0.5); color: #fff; font-weight: bold; font-size: 14px; text-align: center; }
+            .weapon-touch-btn.active { background: rgba(0,255,255,0.5); border-color: #00ffff; }
+            .weapon-touch-btn:active { transform: scale(0.95); }
+            .nuclear-btn { position: absolute; bottom: 180px; right: 20px; padding: 20px; background: rgba(255,0,0,0.7); border-radius: 50%; border: 4px solid #ff0000; color: #fff; font-weight: bold; font-size: 14px; box-shadow: 0 0 20px #ff0000; }
+            .nuclear-btn:active { transform: scale(0.95); }
+            #score-display { font-size: 18px; top: 70px; }
+            #player1-label, #player2-label { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+        <div id="ui-layer">
+            <div id="wave-display">第 1 关</div>
+            <div id="level-display">LV.1</div>
+            <div id="player1-health" class="health-bar"><div class="health-bar-fill" style="width:100%"></div></div>
+            <div id="player2-health" class="health-bar"><div class="health-bar-fill" style="width:100%"></div></div>
+            <div id="player1-label" class="health-label">玩家1</div>
+            <div id="player2-label" class="health-label">玩家2</div>
+            <div id="score-display">得分: 0</div>
+            <div id="nuclear-cooldown" class="hidden">核弹充能中: 10秒</div>
+            <div id="player1-weapons" class="weapon-indicator">
+                <div class="weapon-btn active" data-weapon="normal">1普通</div>
+                <div class="weapon-btn" data-weapon="missile">2导弹</div>
+                <div class="weapon-btn" data-weapon="scatter">3散射</div>
+                <div class="weapon-btn" data-weapon="laser">4激光</div>
+            </div>
+            <div id="player2-weapons" class="weapon-indicator">
+                <div class="weapon-btn active" data-weapon="normal">1普通</div>
+                <div class="weapon-btn" data-weapon="missile">2导弹</div>
+                <div class="weapon-btn" data-weapon="scatter">3散射</div>
+                <div class="weapon-btn" data-weapon="laser">4激光</div>
+            </div>
+            <div id="touch-controls" class="touch-controls">
+                <div id="d-pad" class="d-pad">
+                    <div class="d-btn d-up"></div>
+                    <div class="d-btn d-left"></div>
+                    <div class="d-center"></div>
+                    <div class="d-btn d-right"></div>
+                    <div class="d-btn d-down"></div>
+                </div>
+                <div id="weapon-controls" class="weapon-controls">
+                    <div class="weapon-touch-btn" data-weapon="normal">普通</div>
+                    <div class="weapon-touch-btn" data-weapon="missile">导弹</div>
+                    <div class="weapon-touch-btn" data-weapon="scatter">散射</div>
+                    <div class="weapon-touch-btn" data-weapon="laser">激光</div>
+                </div>
+                <div id="nuclear-btn" class="nuclear-btn hidden">核弹</div>
+            </div>
+            <div id="vs-divider" class="vs-divider hidden"></div>
+        </div>
+        <div id="intro-screen" class="screen">
+            <h1>🎮 飞机大战</h1>
+            <div class="intro-content">
+                <div class="intro-column">
+                    <h3>🎯 玩法介绍</h3>
+                    <div class="intro-section">
+                        <p><strong>🎮 游戏模式</strong></p>
+                        <p>• 对战AI：挑战32关，每4关一个BOSS</p>
+                        <p>• 双人对战：本地双人对抗，一上一下各守半场</p>
+                    </div>
+                    <div class="intro-section">
+                        <p><strong>🎯 武器系统</strong></p>
+                        <p>• 普通弹 (1)：直射子弹，快速连发</p>
+                        <p>• 导弹集束 (2)：5发子弹散射攻击</p>
+                        <p>• 粒子散射 (3)：子弹飞行中分裂为多颗</p>
+                        <p>• 激光束 (4)：瞬间穿透攻击，伤害最高</p>
+                    </div>
+                </div>
+                <div class="intro-column">
+                    <h3>⚡ 技能道具</h3>
+                    <div class="intro-section">
+                        <p><strong>💣 核弹技能</strong></p>
+                        <p>• AI模式下按 <span class="key">K</span> 释放核弹</p>
+                        <p>• 全屏轰炸，造成大规模杀伤</p>
+                        <p>• 10秒冷却时间</p>
+                    </div>
+                    <div class="intro-section">
+                        <p><strong>🎁 掉落物系统</strong></p>
+                        <p>• 🛡️ 护盾：5秒内免疫所有伤害</p>
+                        <p>• ❤️ 回血：恢复30%最大生命值</p>
+                        <p>• 小敌机30%概率掉落，BOSS必定掉落2~5个</p>
+                    </div>
+                    <div class="intro-section">
+                        <p><strong>📈 成长系统</strong></p>
+                        <p>• 击杀敌人获得金币和经验</p>
+                        <p>• 经验满后升级，提升伤害和血量</p>
+                        <p>• 在机库中用金币升级伤害和血量</p>
+                    </div>
+                </div>
+                <div class="intro-column">
+                    <h3>🎮 操作指南</h3>
+                    <div class="intro-section">
+                        <p><strong>🎯 操作方式</strong></p>
+                        <p>• 电脑：WASD移动，1-4切换武器，K释放核弹</p>
+                        <p>• 手机：方向键区域移动，点击武器按钮切换</p>
+                    </div>
+                    <div class="intro-section">
+                        <p><strong>🏆 BOSS关卡</strong></p>
+                        <p>• 第4、8、12...关为BOSS战</p>
+                    </div>
+                    <div class="intro-controls">
+                        <div class="key-row">
+                            <div class="key-group">
+                                <span class="key-large">W</span>
+                                <span class="key-large">A</span>
+                                <span class="key-large">S</span>
+                                <span class="key-large">D</span>
+                            </div>
+                            <span class="label">移动</span>
+                            <div class="key-group">
+                                <span class="key-large">1</span>
+                                <span class="key-large">2</span>
+                                <span class="key-large">3</span>
+                                <span class="key-large">4</span>
+                            </div>
+                            <span class="label">武器</span>
+                            <span class="key-large nuclear-key">K</span>
+                            <span class="label">核弹</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="intro-confirm-box">已知晓</div>
+        </div>
+        <div id="menu-screen" class="screen hidden">
+            <h1>🎮 飞机大战1.0</h1>
+            <div class="player-stats">
+                <div>等级: <span id="menu-level" class="stat-value">LV.1</span></div>
+                <div>金币: <span id="menu-gold" class="gold">0</span></div>
+                <div>经验: <span id="menu-exp" class="exp">0/100</span></div>
+                <div class="exp-bar"><div id="menu-exp-bar" class="exp-bar-fill" style="width:0%"></div></div>
+            </div>
+            <button id="start-btn">开始游戏</button>
+            <button id="hangar-btn" class="gold">机库升级</button>
+            <div class="controls">
+                <h3>操作说明</h3>
+                <p><span class="key">1-4</span> 切换武器模式</p>
+                <p><span class="key">K</span> 核弹 (AI模式)</p>
+            </div>
+            <div id="menu-footer">魏祺轩开发 于2026年7月18日</div>
+        </div>
+        <div id="hangar-screen" class="screen hidden">
+            <h1>🏠 机库</h1>
+            <div class="player-stats" style="position:relative; margin-bottom:20px;">
+                <div>等级: <span id="hangar-level" class="stat-value">LV.1</span></div>
+                <div>金币: <span id="hangar-gold" class="gold">0</span></div>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; justify-content:center;">
+                <div class="upgrade-card">
+                    <h4>⚔️ 伤害升级</h4>
+                    <div class="stat">当前伤害: <span id="damage-level" class="stat-value">Lv.0</span></div>
+                    <div class="stat">伤害加成: <span id="damage-bonus" class="stat-value">0%</span></div>
+                    <div class="cost" id="damage-cost">升级费用: 100 金币</div>
+                    <button id="upgrade-damage-btn" class="gold">升级</button>
+                </div>
+                <div class="upgrade-card">
+                    <h4>❤️ 血量升级</h4>
+                    <div class="stat">当前血量: <span id="hp-level" class="stat-value">Lv.0</span></div>
+                    <div class="stat">血量加成: <span id="hp-bonus" class="stat-value">0%</span></div>
+                    <div class="cost" id="hp-cost">升级费用: 100 金币</div>
+                    <button id="upgrade-hp-btn" class="gold">升级</button>
+                </div>
+            </div>
+            <button id="hangar-back-btn">返回主菜单</button>
+        </div>
+        <div id="mode-screen" class="screen hidden">
+            <h2>选择游戏模式</h2>
+            <div style="display:flex; flex-wrap:wrap; justify-content:center;">
+                <div class="mode-card" id="ai-mode">
+                    <h4>🎯 对战AI</h4>
+                    <p>挑战智能敌人，消灭所有敌机通关</p>
+                    <p>按 K 键释放核弹</p>
+                    <p>胜利获得经验与金币</p>
+                </div>
+                <div class="mode-card" id="pvp-mode">
+                    <h4>⚔️ 双人对战</h4>
+                    <p>本地双人对抗，一上一下各守半场</p>
+                    <p>玩家1 WASD / 玩家2 方向键</p>
+                </div>
+            </div>
+        </div>
+        <div id="weapon-screen" class="screen hidden">
+            <h2>选择武器</h2>
+            <p id="weapon-player-hint">玩家1 选择武器</p>
+            <div style="display:flex; flex-wrap:wrap; justify-content:center;">
+                <div class="weapon-card" data-weapon="normal">
+                    <div class="icon">🔵</div>
+                    <div class="name">普通弹</div>
+                    <div class="desc">直射子弹，快速连发</div>
+                </div>
+                <div class="weapon-card" data-weapon="missile">
+                    <div class="icon">💣</div>
+                    <div class="name">导弹集束</div>
+                    <div class="desc">多发子弹散射攻击</div>
+                </div>
+                <div class="weapon-card" data-weapon="scatter">
+                    <div class="icon">✨</div>
+                    <div class="name">粒子散射</div>
+                    <div class="desc">子弹飞行中分裂</div>
+                </div>
+                <div class="weapon-card" data-weapon="laser">
+                    <div class="icon">🔴</div>
+                    <div class="name">激光束</div>
+                    <div class="desc">瞬间穿透攻击</div>
+                </div>
+            </div>
+            <button id="confirm-weapon-btn" class="hidden">确认选择</button>
+        </div>
+        <div id="reward-screen" class="screen hidden">
+            <div class="reward-popup">
+                <h3>🎉 胜利!</h3>
+                <p>获得 <span class="amount" id="reward-gold">0</span> 金币</p>
+                <p>获得 <span class="amount" id="reward-exp">0</span> 经验</p>
+                <p id="level-up-text" class="hidden">🎊 升级了! 当前等级: LV.X</p>
+                <button id="reward-ok-btn">下一关</button>
+            </div>
+        </div>
+        <div id="game-over-screen" class="screen hidden">
+            <h2 id="game-over-title">游戏结束</h2>
+            <p id="winner-text">胜利者: 玩家1</p>
+            <p id="final-score">最终得分: 0</p>
+            <button id="restart-btn">返回主菜单</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const screens = {
+            intro: document.getElementById('intro-screen'),
+            menu: document.getElementById('menu-screen'),
+            hangar: document.getElementById('hangar-screen'),
+            mode: document.getElementById('mode-screen'),
+            weapon: document.getElementById('weapon-screen'),
+            reward: document.getElementById('reward-screen'),
+            gameOver: document.getElementById('game-over-screen')
+        };
+        const uiElements = {
+            levelDisplay: document.getElementById('level-display'),
+            player1Health: document.querySelector('#player1-health .health-bar-fill'),
+            player2Health: document.querySelector('#player2-health .health-bar-fill'),
+            player1Label: document.getElementById('player1-label'),
+            player2Label: document.getElementById('player2-label'),
+            scoreDisplay: document.getElementById('score-display'),
+            waveDisplay: document.getElementById('wave-display'),
+            nuclearCooldown: document.getElementById('nuclear-cooldown'),
+            player1Weapons: document.getElementById('player1-weapons'),
+            player2Weapons: document.getElementById('player2-weapons'),
+            vsDivider: document.getElementById('vs-divider'),
+            weaponPlayerHint: document.getElementById('weapon-player-hint'),
+            gameOverTitle: document.getElementById('game-over-title'),
+            winnerText: document.getElementById('winner-text'),
+            finalScore: document.getElementById('final-score'),
+            menuLevel: document.getElementById('menu-level'),
+            menuGold: document.getElementById('menu-gold'),
+            menuExp: document.getElementById('menu-exp'),
+            menuExpBar: document.getElementById('menu-exp-bar'),
+            hangarLevel: document.getElementById('hangar-level'),
+            hangarGold: document.getElementById('hangar-gold'),
+            damageLevel: document.getElementById('damage-level'),
+            damageBonus: document.getElementById('damage-bonus'),
+            damageCost: document.getElementById('damage-cost'),
+            hpLevel: document.getElementById('hp-level'),
+            hpBonus: document.getElementById('hp-bonus'),
+            hpCost: document.getElementById('hp-cost'),
+            rewardGold: document.getElementById('reward-gold'),
+            rewardExp: document.getElementById('reward-exp'),
+            levelUpText: document.getElementById('level-up-text')
+        };
+        let gameState = 'MENU';
+        let gameMode = null;
+        let player1Weapon = 'normal';
+        let player2Weapon = 'normal';
+        let score = 0;
+        let wave = 1;
+        let enemiesDefeated = 0;
+        let enemiesPerWave = 5;
+        let nuclearCooldown = 0;
+        let nuclearReady = true;
+        let animationId;
+        const keys = {
+            bottom: { w: false, s: false, a: false, d: false, '1': false, '2': false, '3': false, '4': false, k: false },
+            top: { up: false, down: false, left: false, right: false, '1': false, '2': false, '3': false, '4': false }
+        };
+        const PlayerData = {
+            level: 1,
+            exp: 0,
+            expToNext: 100,
+            gold: 0,
+            damageLevel: 0,
+            hpLevel: 0,
+            load() {
+                const saved = localStorage.getItem('planeWarPlayer');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    this.level = data.level || 1;
+                    this.exp = data.exp || 0;
+                    this.expToNext = data.expToNext || 100;
+                    this.gold = data.gold || 0;
+                    this.damageLevel = data.damageLevel || 0;
+                    this.hpLevel = data.hpLevel || 0;
+                }
+            },
+            save() {
+                localStorage.setItem('planeWarPlayer', JSON.stringify({
+                    level: this.level,
+                    exp: this.exp,
+                    expToNext: this.expToNext,
+                    gold: this.gold,
+                    damageLevel: this.damageLevel,
+                    hpLevel: this.hpLevel
+                }));
+            },
+            addExp(amount) {
+                this.exp += amount;
+                let leveledUp = false;
+                while (this.exp >= this.expToNext) {
+                    this.exp -= this.expToNext;
+                    this.level++;
+                    this.expToNext = Math.floor(100 * Math.pow(1.5, this.level - 1));
+                    leveledUp = true;
+                }
+                this.save();
+                return leveledUp;
+            },
+            addGold(amount) {
+                this.gold += amount;
+                this.save();
+            },
+            getDamageMultiplier() {
+                return 1 + this.damageLevel * 0.2 + (this.level - 1) * 0.1;
+            },
+            getMaxHealth() {
+                return Math.floor(100 * (1 + this.hpLevel * 0.3) + (this.level - 1) * 20);
+            },
+            getUpgradeCost(type) {
+                const level = type === 'damage' ? this.damageLevel : this.hpLevel;
+                return Math.floor(100 * Math.pow(1.5, level));
+            },
+            upgrade(type) {
+                const cost = this.getUpgradeCost(type);
+                if (this.gold >= cost) {
+                    this.gold -= cost;
+                    if (type === 'damage') {
+                        this.damageLevel++;
+                    } else {
+                        this.hpLevel++;
+                    }
+                    this.save();
+                    return true;
+                }
+                return false;
+            }
+        };
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            playShoot() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+            playHit() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+            playExplosion() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(20, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            }
+            playLevelUp() {
+                if (!this.ctx) return;
+                const notes = [523, 659, 784, 1047];
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.1);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime + i * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + i * 0.1 + 0.2);
+                    osc.start(this.ctx.currentTime + i * 0.1);
+                    osc.stop(this.ctx.currentTime + i * 0.1 + 0.2);
+                });
+            }
+            playNuclear() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(10, this.ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.5);
+            }
+        }
+        const soundManager = new SoundManager();
+        class Plane {
+            constructor(x, y, color, team, controls, isAI = false, usePlayerStats = false) {
+                this.x = x; this.y = y; this.width = 60; this.height = 80;
+                this.color = color; this.team = team;
+                this.speed = isAI ? 4 : 6;
+                this.controls = controls;
+                this.isAI = isAI;
+                this.bulletType = 'normal';
+                this.lastShotTime = 0;
+                this.shotInterval = 150;
+                this.aiState = { pattern: 'random', targetX: 0, timer: 0 };
+                this.moveBounds = { minY: 0, maxY: canvas.height };
+                this.isFlipped = team === 'top';
+                this.damageMultiplier = usePlayerStats ? PlayerData.getDamageMultiplier() : 1;
+                this.maxHealth = usePlayerStats ? PlayerData.getMaxHealth() : 100;
+                this.health = this.maxHealth;
+            }
+            draw() {
+                const px = this.x + this.width / 2;
+                const py = this.y + this.height / 2;
+                ctx.save();
+                ctx.translate(px, py);
+                if (this.isFlipped) ctx.rotate(Math.PI);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height/2);
+                ctx.lineTo(-this.width/2, this.height/2);
+                ctx.lineTo(-this.width/4, this.height/3);
+                ctx.lineTo(0, this.height/2.5);
+                ctx.lineTo(this.width/4, this.height/3);
+                ctx.lineTo(this.width/2, this.height/2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = this.team === 'bottom' ? '#0044ff' : '#440000';
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height/4);
+                ctx.lineTo(-this.width/4, this.height/4);
+                ctx.lineTo(0, this.height/3);
+                ctx.lineTo(this.width/4, this.height/4);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                ctx.fill();
+                const engineColor = this.team === 'bottom' ? '#00ffff' : '#ff0000';
+                ctx.fillStyle = engineColor;
+                ctx.beginPath();
+                ctx.moveTo(-5, this.height/2.5);
+                ctx.lineTo(0, this.height/2 + 15);
+                ctx.lineTo(5, this.height/2.5);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+            update() {
+                if (this.isAI) {
+                    this.updateAI();
+                } else {
+                    const c = this.controls;
+                    if (keys[this.team][c.up] && this.y > this.moveBounds.minY) this.y -= this.speed;
+                    if (keys[this.team][c.down] && this.y < this.moveBounds.maxY - this.height) this.y += this.speed;
+                    if (keys[this.team][c.left] && this.x > 0) this.x -= this.speed;
+                    if (keys[this.team][c.right] && this.x < canvas.width - this.width) this.x += this.speed;
+                }
+            }
+            updateAI() {
+                this.aiState.timer++;
+                if (this.aiState.timer > 120 || Math.random() < 0.02) {
+                    const patterns = ['random', 'zigzag', 'circle', 'chase'];
+                    this.aiState.pattern = patterns[Math.floor(Math.random() * patterns.length)];
+                    this.aiState.targetX = Math.random() * (canvas.width - this.width);
+                    this.aiState.timer = 0;
+                }
+                switch(this.aiState.pattern) {
+                    case 'random':
+                        this.x += (Math.random() - 0.5) * this.speed * 3;
+                        break;
+                    case 'zigzag':
+                        this.x += Math.sin(this.aiState.timer * 0.1) * this.speed * 2;
+                        break;
+                    case 'circle':
+                        this.x += Math.cos(this.aiState.timer * 0.05) * this.speed;
+                        break;
+                    case 'chase':
+                        const target = this.team === 'top' ? players.bottom : players.top;
+                        if (target) {
+                            const dx = target.x - this.x;
+                            this.x += Math.sign(dx) * this.speed * 0.5;
+                        }
+                        break;
+                }
+                this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
+                const maxY = canvas.height - 150;
+                if (this.team === 'top') {
+                    const dy = Math.sin(this.aiState.timer * 0.03) * this.speed * 0.5;
+                    this.y = Math.max(40, Math.min(200, this.y + dy));
+                } else {
+                    const dy = Math.sin(this.aiState.timer * 0.03) * this.speed * 0.5;
+                    this.y = Math.max(maxY - 160, Math.min(maxY, this.y + dy));
+                }
+            }
+            shoot(currentTime) {
+                if (currentTime - this.lastShotTime >= this.shotInterval) {
+                    this.lastShotTime = currentTime;
+                    if (!this.isAI) soundManager.playShoot();
+                    return this.createBullets();
+                }
+                return [];
+            }
+            createBullets() {
+                const bullets = [];
+                const centerX = this.x + this.width/2;
+                const bulletY = this.isFlipped ? this.y + this.height : this.y;
+                const direction = this.isFlipped ? 1 : -1;
+                const color = this.team === 'bottom' ? '#00ffff' : '#ff0000';
+                
+                switch(this.bulletType) {
+                    case 'normal':
+                        bullets.push(new Bullet(centerX - 5, bulletY, direction, color, 'normal', {}, this.damageMultiplier));
+                        break;
+                    case 'missile':
+                        for (let i = -2; i <= 2; i++) {
+                            bullets.push(new Bullet(centerX - 5 + i * 15, bulletY, direction, color, 'missile', { angle: i * 0.1 }, this.damageMultiplier));
+                        }
+                        break;
+                    case 'scatter':
+                        bullets.push(new Bullet(centerX - 5, bulletY, direction, color, 'scatter', {}, this.damageMultiplier));
+                        break;
+                    case 'laser':
+                        bullets.push(new Bullet(centerX - 3, bulletY, direction, color, 'laser', {}, this.damageMultiplier));
+                        break;
+                }
+                return bullets;
+            }
+            takeDamage(damage) {
+                this.health -= damage;
+                if (this.health < 0) this.health = 0;
+                this.updateHealthBar();
+            }
+            updateHealthBar() {
+                const bar = this.team === 'bottom' ? uiElements.player1Health : uiElements.player2Health;
+                bar.style.width = `${(this.health / this.maxHealth) * 100}%`;
+            }
+            isAlive() { return this.health > 0; }
+            getBounds() {
+                return { x: this.x + 10, y: this.y + 10, width: this.width - 20, height: this.height - 20 };
+            }
+            setWeapon(weapon) {
+                this.bulletType = weapon;
+                const intervals = { normal: 150, missile: 400, scatter: 300, laser: 600 };
+                this.shotInterval = intervals[weapon];
+            }
+        }
+        class Bullet {
+            constructor(x, y, direction, color, type, params = {}, damageMultiplier = 1) {
+                this.x = x; this.y = y; this.direction = direction; this.color = color; this.type = type;
+                this.params = params;
+                this.damageMultiplier = damageMultiplier;
+                this.speed = type === 'laser' ? 30 : 10;
+                this.baseDamage = type === 'laser' ? 20 : type === 'missile' ? 8 : 10;
+                this.damage = Math.floor(this.baseDamage * damageMultiplier);
+                this.width = type === 'laser' ? 6 : 10;
+                this.height = type === 'laser' ? 100 : 20;
+                this.scattered = false;
+                this.life = type === 'laser' ? 1 : 100;
+            }
+            update() {
+                switch(this.type) {
+                    case 'normal':
+                        this.y += this.speed * this.direction;
+                        break;
+                    case 'missile':
+                        this.y += this.speed * this.direction;
+                        this.x += (this.params.angle || 0) * this.speed;
+                        break;
+                    case 'scatter':
+                        this.y += this.speed * this.direction;
+                        if (!this.scattered && Math.random() < 0.02) {
+                            this.scattered = true;
+                            return 'split';
+                        }
+                        break;
+                    case 'laser':
+                        this.y += this.speed * this.direction;
+                        this.life--;
+                        break;
+                }
+                return null;
+            }
+            draw() {
+                ctx.save();
+                switch(this.type) {
+                    case 'normal':
+                        const grad1 = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+                        grad1.addColorStop(0, '#fff');
+                        grad1.addColorStop(0.5, this.color);
+                        grad1.addColorStop(1, this.color === '#00ffff' ? '#0088ff' : '#880000');
+                        ctx.fillStyle = grad1;
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width/2, this.y + this.height/2, this.width/2, this.height/2, 0, 0, Math.PI*2);
+                        ctx.fill();
+                        break;
+                    case 'missile':
+                        ctx.fillStyle = this.color;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2, this.y);
+                        ctx.lineTo(this.x, this.y + this.height);
+                        ctx.lineTo(this.x + this.width/2, this.y + this.height - 5);
+                        ctx.lineTo(this.x + this.width, this.y + this.height);
+                        ctx.closePath(); ctx.fill();
+                        ctx.fillStyle = '#ffff00';
+                        ctx.beginPath(); ctx.arc(this.x + this.width/2, this.y + 5, 3, 0, Math.PI*2); ctx.fill();
+                        break;
+                    case 'scatter':
+                        ctx.fillStyle = this.color;
+                        ctx.beginPath(); ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = '#fff';
+                        ctx.beginPath(); ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/4, 0, Math.PI*2); ctx.fill();
+                        break;
+                    case 'laser':
+                        const grad2 = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+                        grad2.addColorStop(0, '#fff');
+                        grad2.addColorStop(0.5, this.color);
+                        grad2.addColorStop(1, 'rgba(255,0,0,0)');
+                        ctx.fillStyle = grad2;
+                        ctx.shadowColor = this.color;
+                        ctx.shadowBlur = 20;
+                        ctx.fillRect(this.x, this.y, this.width, this.height);
+                        break;
+                }
+                ctx.restore();
+            }
+            isOffScreen() { return this.y < -this.height || this.y > canvas.height; }
+            isDead() { return this.type === 'laser' && this.life <= 0; }
+            getBounds() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+            split() {
+                const newBullets = [];
+                for (let i = -1; i <= 1; i++) {
+                    if (i === 0) continue;
+                    newBullets.push(new Bullet(this.x + i * 20, this.y, this.direction, this.color, 'normal', {}, this.damageMultiplier));
+                }
+                return newBullets;
+            }
+        }
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                this.size = Math.random() * 6 + 2;
+                this.speedX = (Math.random() - 0.5) * 10;
+                this.speedY = (Math.random() - 0.5) * 10;
+                this.life = 1; this.decay = Math.random() * 0.03 + 0.02;
+            }
+            update() { this.x += this.speedX; this.y += this.speedY; this.life -= this.decay; this.size *= 0.95; }
+            draw() {
+                ctx.save(); ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+            }
+            isDead() { return this.life <= 0; }
+        }
+        class PowerUp {
+            constructor(x, y, type) {
+                this.x = x; this.y = y;
+                this.type = type;
+                this.width = 30;
+                this.height = 30;
+                this.speed = 2;
+                this.rotation = 0;
+                this.rotationSpeed = 0.05;
+                this.bobOffset = Math.random() * Math.PI * 2;
+            }
+            update() {
+                this.y += this.speed;
+                this.rotation += this.rotationSpeed;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.width/2, this.y + this.height/2);
+                ctx.rotate(this.rotation);
+                const bob = Math.sin(Date.now() / 200 + this.bobOffset) * 3;
+                ctx.translate(0, bob);
+                
+                if (this.type === 'shield') {
+                    ctx.fillStyle = '#00ffff';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.height/2);
+                    ctx.lineTo(this.width/2, 0);
+                    ctx.lineTo(0, this.height/2);
+                    ctx.lineTo(-this.width/2, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🛡', 0, 0);
+                } else {
+                    ctx.fillStyle = '#ff4444';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.width/2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('❤️', 0, 0);
+                }
+                
+                ctx.restore();
+            }
+            isOffScreen() { return this.y > canvas.height; }
+            getBounds() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        }
+        const players = { bottom: null, top: null };
+        let enemies = [];
+        let player1Bullets = [];
+        let player2Bullets = [];
+        let particles = [];
+        let powerUps = [];
+        let isNuclearActive = false;
+        let nuclearTimer = 0;
+        let rewardGold = 0;
+        let rewardExp = 0;
+        let shieldActive = false;
+        let shieldTime = 0;
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            screens[screenName].classList.remove('hidden');
+        }
+        function updateMenuStats() {
+            uiElements.menuLevel.textContent = `LV.${PlayerData.level}`;
+            uiElements.menuGold.textContent = PlayerData.gold;
+            uiElements.menuExp.textContent = `${PlayerData.exp}/${PlayerData.expToNext}`;
+            uiElements.menuExpBar.style.width = `${(PlayerData.exp / PlayerData.expToNext) * 100}%`;
+            uiElements.hangarLevel.textContent = `LV.${PlayerData.level}`;
+            uiElements.hangarGold.textContent = PlayerData.gold;
+            uiElements.damageLevel.textContent = `Lv.${PlayerData.damageLevel}`;
+            uiElements.damageBonus.textContent = `${(PlayerData.damageLevel * 20 + (PlayerData.level - 1) * 10)}%`;
+            uiElements.damageCost.textContent = `升级费用: ${PlayerData.getUpgradeCost('damage')} 金币`;
+            uiElements.hpLevel.textContent = `Lv.${PlayerData.hpLevel}`;
+            uiElements.hpBonus.textContent = `${(PlayerData.hpLevel * 30)}% + ${(PlayerData.level - 1) * 20}HP`;
+            uiElements.hpCost.textContent = `升级费用: ${PlayerData.getUpgradeCost('hp')} 金币`;
+            document.getElementById('upgrade-damage-btn').disabled = PlayerData.gold < PlayerData.getUpgradeCost('damage');
+            document.getElementById('upgrade-hp-btn').disabled = PlayerData.gold < PlayerData.getUpgradeCost('hp');
+        }
+        function initGame() {
+            soundManager.init();
+            gameState = 'PLAYING';
+            score = 0;
+            wave = 1;
+            enemiesDefeated = 0;
+            nuclearCooldown = 0;
+            nuclearReady = true;
+            isNuclearActive = false;
+            player1Bullets = [];
+            player2Bullets = [];
+            particles = [];
+            powerUps = [];
+            shieldActive = false;
+            shieldTime = 0;
+            uiElements.scoreDisplay.textContent = '得分: 0';
+            uiElements.waveDisplay.textContent = '第 1 波';
+            uiElements.levelDisplay.textContent = `LV.${PlayerData.level}`;
+            uiElements.nuclearCooldown.classList.add('hidden');
+            uiElements.vsDivider.classList.toggle('hidden', gameMode !== 'pvp');
+            
+            if (gameMode === 'pvp') {
+                uiElements.player1Label.textContent = '玩家1 (WASD)';
+                uiElements.player2Label.textContent = '玩家2 (方向键)';
+                players.bottom = new Plane(canvas.width/2 - 30, canvas.height - 120, '#00aaff', 'bottom', { up: 'w', down: 's', left: 'a', right: 'd' }, false, true);
+                players.top = new Plane(canvas.width/2 - 30, 40, '#ff4444', 'top', { up: 'up', down: 'down', left: 'left', right: 'right' });
+                players.bottom.moveBounds = { minY: canvas.height / 2, maxY: canvas.height };
+                players.top.moveBounds = { minY: 0, maxY: canvas.height / 2 };
+                players.bottom.setWeapon(player1Weapon);
+                players.top.setWeapon(player2Weapon);
+                updateWeaponUI('bottom', player1Weapon);
+                updateWeaponUI('top', player2Weapon);
+            } else {
+                uiElements.player1Label.textContent = '玩家 (WASD)';
+                uiElements.player2Label.textContent = '敌机';
+                players.bottom = new Plane(canvas.width/2 - 30, canvas.height - 120, '#00aaff', 'bottom', { up: 'w', down: 's', left: 'a', right: 'd' }, false, true);
+                players.bottom.setWeapon(player1Weapon);
+                updateWeaponUI('bottom', player1Weapon);
+                spawnEnemies();
+            }
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            gameLoop();
+        }
+        function spawnPowerUp(x, y, count = 1) {
+            for (let i = 0; i < count; i++) {
+                const type = Math.random() < 0.5 ? 'shield' : 'heal';
+                const offsetX = (Math.random() - 0.5) * 100;
+                const offsetY = Math.random() * 30;
+                powerUps.push(new PowerUp(x + offsetX - 15, y + offsetY, type));
+            }
+        }
+        const bossNames = [
+            { name: '虚空领主·毁灭者', color: '#ff0000', bgColor: 'rgba(255,0,0,0.3)' },
+            { name: '深渊魔王·暗影', color: '#8800ff', bgColor: 'rgba(136,0,255,0.3)' },
+            { name: '炼狱修罗·炎魔', color: '#ff4400', bgColor: 'rgba(255,68,0,0.3)' },
+            { name: '冰霜巨龙·凛冬', color: '#00ffff', bgColor: 'rgba(0,255,255,0.3)' },
+            { name: '机械战神·终结者', color: '#00ff00', bgColor: 'rgba(0,255,0,0.3)' },
+            { name: '死亡使者·收割者', color: '#ffffff', bgColor: 'rgba(255,255,255,0.3)' },
+            { name: '混沌之神·虚空', color: '#ff00ff', bgColor: 'rgba(255,0,255,0.3)' },
+            { name: '雷霆风暴·审判者', color: '#ffff00', bgColor: 'rgba(255,255,0,0.3)' }
+        ];
+        function spawnEnemies() {
+            enemies = [];
+            const cycle = Math.ceil(wave / 4);
+            const stageInCycle = wave % 4 || 4;
+            const isBossWave = stageInCycle === 4;
+            const playerMaxHealth = PlayerData.getMaxHealth();
+            const difficultyMultiplier = 1 + (cycle - 1) * 0.3;
+            
+            if (isBossWave) {
+                const bossIndex = (cycle - 1) % bossNames.length;
+                const bossInfo = bossNames[bossIndex];
+                const bossX = canvas.width / 2 - 50;
+                const boss = new Plane(bossX, 40, bossInfo.color, 'top', {}, true);
+                boss.width = 100 + cycle * 5;
+                boss.height = 120 + cycle * 5;
+                const isDoubleHealth = cycle % 2 === 0;
+                const healthPerBar = Math.floor(playerMaxHealth * 2 * difficultyMultiplier);
+                boss.maxHealth = isDoubleHealth ? healthPerBar * 2 : healthPerBar;
+                boss.health = boss.maxHealth;
+                boss.currentHealthBar = isDoubleHealth ? 2 : 1;
+                boss.maxHealthPerBar = healthPerBar;
+                boss.speed = Math.max(2, 3 - cycle * 0.2);
+                boss.shotInterval = Math.max(200, 500 - cycle * 30);
+                boss.bulletType = cycle > 2 ? 'missile' : 'laser';
+                boss.bossName = bossInfo.name;
+                boss.bossColor = bossInfo.color;
+                boss.bossBgColor = bossInfo.bgColor;
+                boss.isDoubleHealth = isDoubleHealth;
+                enemies.push(boss);
+                uiElements.waveDisplay.innerHTML = `<span style="color:#ff0000; font-size:24px; text-shadow:0 0 20px #ff0000;">🔥 BOSS战 - ${bossInfo.name} 🔥</span>`;
+            } else {
+                const count = Math.min(wave + 2, 8 + cycle);
+                for (let i = 0; i < count; i++) {
+                    const x = (canvas.width / (count + 1)) * (i + 1) - 30;
+                    const y = 40 + i * 25;
+                    const colors = ['#ff4444', '#ff8800', '#ff00ff', '#8800ff', '#ff4488'];
+                    const enemy = new Plane(x, y, colors[i % colors.length], 'top', {}, true);
+                    enemy.maxHealth = Math.floor(playerMaxHealth * 0.25 * difficultyMultiplier);
+                    enemy.health = enemy.maxHealth;
+                    enemy.speed = 4 + cycle * 0.3;
+                    const weapons = ['normal', 'missile', 'scatter', 'laser'];
+                    enemy.setWeapon(weapons[Math.floor(Math.random() * weapons.length)]);
+                    enemies.push(enemy);
+                }
+                uiElements.waveDisplay.textContent = `第 ${wave} 关`;
+            }
+        }
+        function createExplosion(x, y, color, count = 20) {
+            soundManager.playExplosion();
+            for (let i = 0; i < count; i++) particles.push(new Particle(x, y, color));
+        }
+        function triggerNuclear() {
+            if (!nuclearReady || gameMode !== 'ai') return;
+            nuclearReady = false;
+            nuclearCooldown = 10;
+            isNuclearActive = true;
+            nuclearTimer = 0;
+            soundManager.playNuclear();
+            createExplosion(canvas.width/2, canvas.height/2, '#ffff00', 100);
+        }
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+        function updateWeaponUI(player, weapon) {
+            const container = player === 'bottom' ? uiElements.player1Weapons : uiElements.player2Weapons;
+            container.querySelectorAll('.weapon-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.weapon === weapon);
+            });
+        }
+        function gameLoop() {
+            if (gameState !== 'PLAYING') return;
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawStars();
+            if (nuclearCooldown > 0) {
+                uiElements.nuclearCooldown.classList.remove('hidden');
+                uiElements.nuclearCooldown.textContent = `核弹充能中: ${nuclearCooldown}秒`;
+            } else if (!nuclearReady) {
+                nuclearReady = true;
+                uiElements.nuclearCooldown.textContent = '核弹就绪! 按 K 释放';
+            }
+            if (players.bottom) {
+                players.bottom.update();
+                players.bottom.draw();
+            }
+            if (gameMode === 'pvp' && players.top) {
+                players.top.update();
+                players.top.draw();
+            } else if (gameMode === 'ai') {
+                enemies.forEach(e => {
+                    e.update();
+                    e.draw();
+                    if (e.bossName) {
+                        const hpBarWidth = 200;
+                        const x = e.x + e.width / 2 - hpBarWidth / 2;
+                        const y = e.y - 55;
+                        const isDouble = e.isDoubleHealth;
+                        const barCount = isDouble ? 2 : 1;
+                        
+                        ctx.save();
+                        ctx.fillStyle = e.bossBgColor;
+                        const bgHeight = isDouble ? 65 : 50;
+                        ctx.fillRect(x - 5, y - 35, hpBarWidth + 10, bgHeight);
+                        
+                        ctx.fillStyle = e.bossColor;
+                        ctx.font = 'bold 18px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.shadowColor = e.bossColor;
+                        ctx.shadowBlur = 10;
+                        ctx.fillText(e.bossName, e.x + e.width / 2, y - 15);
+                        
+                        if (isDouble) {
+                            const bar1Remaining = Math.max(0, e.health - e.maxHealthPerBar);
+                            const bar1Percent = (bar1Remaining / e.maxHealthPerBar) * 100;
+                            const bar2Remaining = Math.min(e.health, e.maxHealthPerBar);
+                            const bar2Percent = (bar2Remaining / e.maxHealthPerBar) * 100;
+                            
+                            ctx.fillStyle = '#333';
+                            ctx.fillRect(x, y, hpBarWidth, 15);
+                            ctx.fillRect(x, y + 20, hpBarWidth, 15);
+                            
+                            const bar1Color = bar1Percent > 50 ? '#00ff00' : bar1Percent > 25 ? '#ffff00' : '#ff0000';
+                            const bar2Color = bar2Percent > 50 ? '#00ff00' : bar2Percent > 25 ? '#ffff00' : '#ff0000';
+                            
+                            ctx.fillStyle = bar1Color;
+                            ctx.fillRect(x, y, hpBarWidth * (bar1Percent / 100), 15);
+                            ctx.fillStyle = bar2Color;
+                            ctx.fillRect(x, y + 20, hpBarWidth * (bar2Percent / 100), 15);
+                            
+                            ctx.strokeStyle = '#fff';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(x, y, hpBarWidth, 15);
+                            ctx.strokeRect(x, y + 20, hpBarWidth, 15);
+                            
+                            ctx.fillStyle = '#fff';
+                            ctx.font = 'bold 12px Arial';
+                            ctx.shadowBlur = 0;
+                            ctx.fillText(`1/${barCount}`, x + 15, y + 12);
+                            ctx.fillText(`2/${barCount}`, x + 15, y + 32);
+                            ctx.fillText(`${Math.floor((e.health / e.maxHealth) * 100)}%`, e.x + e.width / 2, y + 32);
+                        } else {
+                            const hpPercent = (e.health / e.maxHealth) * 100;
+                            
+                            ctx.fillStyle = '#333';
+                            ctx.fillRect(x, y, hpBarWidth, 15);
+                            
+                            const hpColor = hpPercent > 50 ? '#00ff00' : hpPercent > 25 ? '#ffff00' : '#ff0000';
+                            ctx.fillStyle = hpColor;
+                            ctx.fillRect(x, y, hpBarWidth * (hpPercent / 100), 15);
+                            
+                            ctx.strokeStyle = '#fff';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(x, y, hpBarWidth, 15);
+                            
+                            ctx.fillStyle = '#fff';
+                            ctx.font = 'bold 12px Arial';
+                            ctx.shadowBlur = 0;
+                            ctx.fillText(`${Math.floor(hpPercent)}%`, e.x + e.width / 2, y + 12);
+                        }
+                        ctx.restore();
+                    }
+                });
+            }
+            const currentTime = Date.now();
+            if (players.bottom) {
+                const newBullets = players.bottom.shoot(currentTime);
+                player1Bullets.push(...newBullets);
+            }
+            if (gameMode === 'pvp' && players.top) {
+                const newBullets = players.top.shoot(currentTime);
+                player2Bullets.push(...newBullets);
+            } else if (gameMode === 'ai') {
+                enemies.forEach(e => {
+                    const newBullets = e.shoot(currentTime);
+                    player2Bullets.push(...newBullets);
+                });
+            }
+            player1Bullets = player1Bullets.filter(bullet => {
+                const result = bullet.update();
+                if (result === 'split') {
+                    player1Bullets.push(...bullet.split());
+                    return false;
+                }
+                bullet.draw();
+                if (bullet.isOffScreen() || bullet.isDead()) return false;
+                
+                if (gameMode === 'pvp' && players.top && checkCollision(bullet.getBounds(), players.top.getBounds())) {
+                    players.top.takeDamage(bullet.damage);
+                    soundManager.playHit();
+                    createExplosion(bullet.x + bullet.width/2, bullet.y + bullet.height/2, '#ff0000');
+                    return false;
+                }
+                
+                if (gameMode === 'ai') {
+                    for (let i = enemies.length - 1; i >= 0; i--) {
+                        if (checkCollision(bullet.getBounds(), enemies[i].getBounds())) {
+                            enemies[i].takeDamage(bullet.damage);
+                            soundManager.playHit();
+                            score += 10;
+                            uiElements.scoreDisplay.textContent = '得分: ' + score;
+                            createExplosion(bullet.x + bullet.width/2, bullet.y + bullet.height/2, '#ffff00');
+                            if (!enemies[i].isAlive()) {
+                                const enemy = enemies[i];
+                                const isBoss = enemy.width > 70;
+                                enemies.splice(i, 1);
+                                enemiesDefeated++;
+                                if (gameMode === 'ai') {
+                                    PlayerData.addGold(10);
+                                    const leveledUp = PlayerData.addExp(20);
+                                    if (leveledUp) {
+                                        soundManager.playLevelUp();
+                                        uiElements.levelDisplay.textContent = `LV.${PlayerData.level}`;
+                                    }
+                                }
+                                if (isBoss) {
+                                    const dropCount = Math.floor(Math.random() * 4) + 2;
+                                    spawnPowerUp(enemy.x + enemy.width/2, enemy.y + enemy.height/2, dropCount);
+                                } else {
+                                    if (Math.random() < 0.3) {
+                                        spawnPowerUp(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 1);
+                                    }
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            });
+            player2Bullets = player2Bullets.filter(bullet => {
+                const result = bullet.update();
+                if (result === 'split') {
+                    player2Bullets.push(...bullet.split());
+                    return false;
+                }
+                bullet.draw();
+                if (bullet.isOffScreen() || bullet.isDead()) return false;
+                
+                if (players.bottom && checkCollision(bullet.getBounds(), players.bottom.getBounds())) {
+                    if (!shieldActive) {
+                        players.bottom.takeDamage(bullet.damage);
+                        soundManager.playHit();
+                        createExplosion(bullet.x + bullet.width/2, bullet.y + bullet.height/2, '#ff0000');
+                    } else {
+                        createExplosion(bullet.x + bullet.width/2, bullet.y + bullet.height/2, '#00ffff', 5);
+                    }
+                    return false;
+                }
+                return true;
+            });
+            particles = particles.filter(p => { p.update(); p.draw(); return !p.isDead(); });
+            powerUps = powerUps.filter(powerUp => {
+                powerUp.update();
+                powerUp.draw();
+                if (powerUp.isOffScreen()) return false;
+                if (players.bottom && checkCollision(powerUp.getBounds(), players.bottom.getBounds())) {
+                    if (powerUp.type === 'shield') {
+                        shieldActive = true;
+                        shieldTime = 5000;
+                        soundManager.playShoot();
+                    } else {
+                        const healAmount = Math.floor(players.bottom.maxHealth * 0.3);
+                        players.bottom.health = Math.min(players.bottom.maxHealth, players.bottom.health + healAmount);
+                        players.bottom.updateHealthBar();
+                        soundManager.playHit();
+                    }
+                    createExplosion(powerUp.x + powerUp.width/2, powerUp.y + powerUp.height/2, '#00ff00', 10);
+                    return false;
+                }
+                return true;
+            });
+            if (shieldActive) {
+                shieldTime -= 16;
+                if (shieldTime <= 0) {
+                    shieldActive = false;
+                }
+                ctx.save();
+                ctx.strokeStyle = `rgba(0,255,255,${shieldTime / 5000})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(players.bottom.x + players.bottom.width/2, players.bottom.y + players.bottom.height/2, players.bottom.width/2 + 10, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+            if (gameMode === 'pvp') {
+                if (!players.bottom.isAlive()) endGame('top');
+                else if (!players.top.isAlive()) endGame('bottom');
+            } else {
+                if (!players.bottom.isAlive()) endGame('top');
+                else if (enemies.length === 0) {
+                    const isBossWave = wave % 4 === 0;
+                    if (gameMode === 'ai') {
+                        if (isBossWave) {
+                            PlayerData.addGold(500);
+                            const leveledUp = PlayerData.addExp(500);
+                            if (leveledUp) {
+                                soundManager.playLevelUp();
+                                uiElements.levelDisplay.textContent = `LV.${PlayerData.level}`;
+                            }
+                            rewardGold = 500 + enemiesDefeated * 10;
+                            rewardExp = 500 + enemiesDefeated * 20;
+                            if (wave >= 32) {
+                                PlayerData.addGold(2000);
+                                PlayerData.addExp(2000);
+                                rewardGold += 2000;
+                                rewardExp += 2000;
+                                showReward();
+                                return;
+                            }
+                            showReward();
+                            wave++;
+                            enemiesDefeated = 0;
+                            enemiesPerWave = Math.min(5 + wave, 10);
+                            return;
+                        } else {
+                            PlayerData.addGold(100);
+                            const leveledUp = PlayerData.addExp(150);
+                            if (leveledUp) {
+                                soundManager.playLevelUp();
+                                uiElements.levelDisplay.textContent = `LV.${PlayerData.level}`;
+                            }
+                        }
+                    }
+                    wave++;
+                    enemiesDefeated = 0;
+                    enemiesPerWave = Math.min(5 + wave, 10);
+                    if (wave <= 32) {
+                        spawnEnemies();
+                    }
+                }
+            }
+            if (isNuclearActive) {
+                nuclearTimer++;
+                const alpha = Math.min(1, nuclearTimer / 30);
+                ctx.fillStyle = `rgba(255,255,0,${alpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (nuclearTimer > 60) {
+                    isNuclearActive = false;
+                    if (gameMode === 'ai') {
+                        enemies.forEach(e => e.takeDamage(50));
+                        createExplosion(canvas.width/2, canvas.height/3, '#ff6600', 50);
+                    }
+                }
+            }
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        function showReward() {
+            gameState = 'REWARD';
+            cancelAnimationFrame(animationId);
+            uiElements.rewardGold.textContent = rewardGold;
+            uiElements.rewardExp.textContent = rewardExp;
+            const currentLevel = PlayerData.level;
+            uiElements.levelUpText.textContent = `🎊 升级了! 当前等级: LV.${currentLevel}`;
+            uiElements.levelUpText.classList.toggle('hidden', PlayerData.level <= 1);
+            document.getElementById('reward-ok-btn').textContent = wave >= 32 ? '通关完成' : '下一关';
+            showScreen('reward');
+        }
+        function endGame(winner) {
+            gameState = 'GAME_OVER';
+            cancelAnimationFrame(animationId);
+            setTimeout(() => {
+                uiElements.gameOverTitle.textContent = winner === 'bottom' ? '🎉 胜利!' : '💀 失败!';
+                uiElements.winnerText.textContent = winner === 'bottom' ? '胜利者: 玩家1' : gameMode === 'pvp' ? '胜利者: 玩家2' : '胜利者: AI';
+                uiElements.finalScore.textContent = `最终得分: ${score}`;
+                showScreen('gameOver');
+            }, 1000);
+        }
+        function drawStars() {
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 73 + Date.now() / 50) % canvas.width;
+                const y = (i * 37) % canvas.height;
+                const size = (Math.sin(Date.now() / 1000 + i) + 1) / 2 * 2 + 1;
+                ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI*2); ctx.fill();
+            }
+        }
+        let weaponSelectPlayer = 1;
+        PlayerData.load();
+        updateMenuStats();
+        document.getElementById('intro-confirm-box').addEventListener('click', () => {
+            soundManager.init();
+            showScreen('menu');
+        });
+        document.getElementById('start-btn').addEventListener('click', () => {
+            soundManager.init();
+            gameState = 'MODE_SELECT';
+            showScreen('mode');
+        });
+        document.getElementById('hangar-btn').addEventListener('click', () => {
+            soundManager.init();
+            updateMenuStats();
+            gameState = 'HANGAR';
+            showScreen('hangar');
+        });
+        document.getElementById('hangar-back-btn').addEventListener('click', () => {
+            gameState = 'MENU';
+            updateMenuStats();
+            showScreen('menu');
+        });
+        document.getElementById('upgrade-damage-btn').addEventListener('click', () => {
+            if (PlayerData.upgrade('damage')) {
+                soundManager.playLevelUp();
+                updateMenuStats();
+            }
+        });
+        document.getElementById('upgrade-hp-btn').addEventListener('click', () => {
+            if (PlayerData.upgrade('hp')) {
+                soundManager.playLevelUp();
+                updateMenuStats();
+            }
+        });
+        document.getElementById('ai-mode').addEventListener('click', () => {
+            gameMode = 'ai';
+            weaponSelectPlayer = 1;
+            uiElements.weaponPlayerHint.textContent = '玩家 选择武器';
+            document.querySelectorAll('.weapon-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById('confirm-weapon-btn').classList.add('hidden');
+            showScreen('weapon');
+        });
+        document.getElementById('pvp-mode').addEventListener('click', () => {
+            gameMode = 'pvp';
+            weaponSelectPlayer = 1;
+            uiElements.weaponPlayerHint.textContent = '玩家1 选择武器';
+            document.querySelectorAll('.weapon-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById('confirm-weapon-btn').classList.add('hidden');
+            showScreen('weapon');
+        });
+        document.querySelectorAll('.weapon-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.weapon-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                if (weaponSelectPlayer === 1) {
+                    player1Weapon = card.dataset.weapon;
+                    document.getElementById('confirm-weapon-btn').classList.remove('hidden');
+                } else {
+                    player2Weapon = card.dataset.weapon;
+                    document.getElementById('confirm-weapon-btn').classList.remove('hidden');
+                }
+            });
+        });
+        document.getElementById('confirm-weapon-btn').addEventListener('click', () => {
+            if (weaponSelectPlayer === 1) {
+                weaponSelectPlayer = 2;
+                uiElements.weaponPlayerHint.textContent = '玩家2 选择武器';
+                document.querySelectorAll('.weapon-card').forEach(c => c.classList.remove('selected'));
+                document.getElementById('confirm-weapon-btn').classList.add('hidden');
+                if (gameMode === 'ai') {
+                    initGame();
+                }
+            } else {
+                initGame();
+            }
+        });
+        document.getElementById('reward-ok-btn').addEventListener('click', () => {
+            if (wave >= 32) {
+                gameState = 'MENU';
+                updateMenuStats();
+                showScreen('menu');
+            } else {
+                gameState = 'PLAYING';
+                spawnEnemies();
+                Object.values(screens).forEach(s => s.classList.add('hidden'));
+                gameLoop();
+            }
+        });
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            gameState = 'MENU';
+            updateMenuStats();
+            showScreen('menu');
+        });
+        document.addEventListener('keydown', e => {
+            const key = e.key.toLowerCase();
+            if (key === 'w' || key === 's' || key === 'a' || key === 'd') {
+                keys.bottom[key] = true;
+            }
+            if (e.key === 'ArrowUp') keys.top.up = true;
+            if (e.key === 'ArrowDown') keys.top.down = true;
+            if (e.key === 'ArrowLeft') keys.top.left = true;
+            if (e.key === 'ArrowRight') keys.top.right = true;
+            if (['1', '2', '3', '4'].includes(e.key)) {
+                keys.bottom[e.key] = true;
+                keys.top[e.key] = true;
+                if (gameState === 'PLAYING' && players.bottom) {
+                    const weapons = { '1': 'normal', '2': 'missile', '3': 'scatter', '4': 'laser' };
+                    players.bottom.setWeapon(weapons[e.key]);
+                    updateWeaponUI('bottom', weapons[e.key]);
+                    if (gameMode === 'pvp' && players.top) {
+                        players.top.setWeapon(weapons[e.key]);
+                        updateWeaponUI('top', weapons[e.key]);
+                    }
+                }
+            }
+            if (key === 'k' && gameMode === 'ai' && gameState === 'PLAYING') {
+                triggerNuclear();
+            }
+        });
+        document.addEventListener('keyup', e => {
+            const key = e.key.toLowerCase();
+            if (key === 'w' || key === 's' || key === 'a' || key === 'd') {
+                keys.bottom[key] = false;
+            }
+            if (e.key === 'ArrowUp') keys.top.up = false;
+            if (e.key === 'ArrowDown') keys.top.down = false;
+            if (e.key === 'ArrowLeft') keys.top.left = false;
+            if (e.key === 'ArrowRight') keys.top.right = false;
+            if (['1', '2', '3', '4'].includes(e.key)) {
+                keys.bottom[e.key] = false;
+                keys.top[e.key] = false;
+            }
+        });
+        const dPad = document.getElementById('d-pad');
+        if (dPad) {
+            dPad.addEventListener('touchstart', e => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = dPad.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                
+                if (y < 50) keys.bottom.w = true;
+                if (y > 100) keys.bottom.s = true;
+                if (x < 50) keys.bottom.a = true;
+                if (x > 100) keys.bottom.d = true;
+            });
+            dPad.addEventListener('touchend', e => {
+                e.preventDefault();
+                keys.bottom.w = false;
+                keys.bottom.s = false;
+                keys.bottom.a = false;
+                keys.bottom.d = false;
+            });
+            dPad.addEventListener('touchmove', e => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = dPad.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                
+                keys.bottom.w = y < 50;
+                keys.bottom.s = y > 100;
+                keys.bottom.a = x < 50;
+                keys.bottom.d = x > 100;
+            });
+        }
+        const weaponControls = document.getElementById('weapon-controls');
+        if (weaponControls) {
+            weaponControls.addEventListener('touchstart', e => {
+                e.preventDefault();
+                const target = e.target.closest('.weapon-touch-btn');
+                if (target && gameState === 'PLAYING' && players.bottom) {
+                    const weapon = target.dataset.weapon;
+                    players.bottom.setWeapon(weapon);
+                    updateWeaponUI('bottom', weapon);
+                    document.querySelectorAll('.weapon-touch-btn').forEach(btn => btn.classList.remove('active'));
+                    target.classList.add('active');
+                }
+            });
+        }
+        const nuclearBtn = document.getElementById('nuclear-btn');
+        if (nuclearBtn) {
+            nuclearBtn.addEventListener('touchstart', e => {
+                e.preventDefault();
+                if (gameMode === 'ai' && gameState === 'PLAYING') {
+                    triggerNuclear();
+                }
+            });
+        }
+        setInterval(() => {
+            if (nuclearCooldown > 0) {
+                nuclearCooldown--;
+                if (nuclearCooldown === 0) {
+                    uiElements.nuclearCooldown.classList.add('hidden');
+                }
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
